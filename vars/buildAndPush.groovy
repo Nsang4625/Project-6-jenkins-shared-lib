@@ -1,5 +1,5 @@
 /**
- * Build and push the docker image using Kaniko
+ * Generate Kaniko pod template to build and push Docker image to ECR
  * @param config Map of configuration options:
  * - language: Programming language/framework (required)
  * - repository: ECR repository name(required)
@@ -14,17 +14,18 @@
 def call(Map config = [:]){
   validateConfig(config)
   overrideConfig(config)
-  buildAndPushImage(config)
+  unstash(config.stashName)
   if(config.language == 'java'){
-    sh "mvn package"
+    container(name: 'maven') {
+      sh "mvn package"
+    }
   }
-  stash(name: 'source')
+  container(name: 'kaniko') {
+    sh( "/kaniko/executor --context=${config.context} --dockerfile=${config.dockerfile} --destination=${config.registry}/${config.repository}:${config.tag}")
+  }
 }
 
 private def validateConfig(Map config){
-  if(!config.language){
-    error "Build and push failed: 'language' parameter is required"
-  }
   if(!config.repository){
     error "Build and push failed: 'repository' parameter is required"
   }
@@ -40,8 +41,8 @@ private def overrideConfig(Map config){
   config.context = config.context ?: "."
   config.stashName = config.stashName ?: "source"
 }
-private def buildAndPushImage(){
-  def kanikoPodYaml = """
+private def genTemplate(){
+  return kanikoPodYaml = """
 apiVersion: v1
 kind: Pod
 metadata:
@@ -61,14 +62,4 @@ spec:
     - name: AWS_SDK_LOAD_CONFIG
       value: "true"
 """
-  agent{
-      kubernetes {
-        yaml kanikoPodYaml
-      }
-  }
-  container(name: 'kaniko'){
-    unstash(name: 'source')
-    sh "ls"
-    sh "/kaniko/executor --dockerfile=${config.dockerfile} --context=${config.context} --destination=${config.registry}/${config.repository}:${config.tag}"
-  }
 }
