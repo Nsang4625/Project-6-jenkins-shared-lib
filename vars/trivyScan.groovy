@@ -69,6 +69,7 @@ private def pullImage(String imageName, Map config){
         }
         """
         writeFile file: "auth.json", text: authConfig
+        sh "cat auth.json"
         
         // Use the auth file with skopeo
         sh """
