@@ -26,7 +26,7 @@ def call(Map config = [:]) {
     handleScanResult(result, exitCode, outputFile)
 }
 
-private void handleScanResult(Map result, int exitCode, String outputFile) {
+private def handleScanResult(Map result, int exitCode, String outputFile) {
     def criticalCount = result.Results.sum { it.Vulnerabilities.count { it.Severity == 'CRITICAL' } }
     
     if (criticalCount > 0) {
@@ -38,7 +38,7 @@ private void handleScanResult(Map result, int exitCode, String outputFile) {
     sh "aws s3 cp ${outputFile} s3://my-bucket/trivy-reports/"
 }
 
-private void validateInput(Map config){
+private def validateInput(Map config){
     if(!config.repository){
         error "Trivy scan failed: 'repository' parameter is required"
     }
@@ -53,7 +53,7 @@ private void validateInput(Map config){
     }
 }
 
-private void pullImage(String imageName, Map config){
+private def pullImage(String imageName, Map config){
     if(config.registryType == 'ecr'){
         sh "aws ecr get-login-password --region ${config.awsRegion} | skopeo login --username AWS --password-stdin ${config.awsAccountId}.dkr.ecr.${config.awsRegion}.amazonaws.com"
         sh "skopeo copy docker://${config.awsAccountId}.dkr.ecr.${config.awsRegion}.amazonaws.com/${imageName} docker-archive:${imageName}.tar"
