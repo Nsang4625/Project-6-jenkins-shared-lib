@@ -11,7 +11,7 @@
 
 def call(Map config = [:]) {
     validateInput(config)
-    def outputFile = "trivy-scan-${env.GIT_COMMIT[0..8]}.json"
+    def outputFile = "trivy-scan.json"
     def imageName = "${config.repository}:${config.tag}"
     pullImage(imageName, config)
     def exitCode = sh script: """
