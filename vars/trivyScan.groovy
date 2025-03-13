@@ -2,9 +2,9 @@
  * Scans a Docker image using Trivy
  * 
  * @param config Map of configuration options:
- * - repository: Image repository name
- * - tag: Image tag
- * - registryType: Registry type(ecr | dockerhub)
+ * - repository: Image repository name (required)
+ * - tag: Image tag (required)
+ * - registryType: Registry type(ecr | dockerhub) (required)
  * - awsRegion: AWS region for ECR registry
  * - awsAccountId: AWS account ID for ECR registry
  */
@@ -38,7 +38,7 @@ private void handleScanResult(Map result, int exitCode, String outputFile) {
     sh "aws s3 cp ${outputFile} s3://my-bucket/trivy-reports/"
 }
 
-private validateInput(){
+private void validateInput(Map config){
     if(!config.registry){
         error "Trivy scan failed: 'registry' parameter is required"
     }
