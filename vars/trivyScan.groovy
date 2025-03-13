@@ -55,7 +55,29 @@ private def validateInput(Map config){
 
 private def pullImage(String imageName, Map config){
     if(config.registryType == 'ecr'){
-        sh "aws ecr get-login-password --region ${config.awsRegion} | skopeo login --username AWS --password-stdin ${config.awsAccountId}.dkr.ecr.${config.awsRegion}.amazonaws.com"
-        sh "skopeo copy docker://${config.awsAccountId}.dkr.ecr.${config.awsRegion}.amazonaws.com/${imageName} docker-archive:${imageName}.tar"
+        // Get ECR auth token
+        def ecrAuthToken = sh(script: "aws ecr get-login-password --region ${config.awsRegion}", returnStdout: true).trim()
+        
+        // Set up a temp auth.json file in the workspace
+        def authConfig = """
+        {
+            "auths": {
+                "${config.awsAccountId}.dkr.ecr.${config.awsRegion}.amazonaws.com": {
+                    "auth": "${ecrAuthToken}"
+                }
+            }
+        }
+        """
+        writeFile file: "auth.json", text: authConfig
+        
+        // Use the auth file with skopeo
+        sh """
+            skopeo copy --authfile=auth.json \
+                docker://${config.awsAccountId}.dkr.ecr.${config.awsRegion}.amazonaws.com/${config.repository}:${config.tag} \
+                docker-archive:${imageName}.tar
+            rm -f auth.json
+        """
+    } else if(config.registryType == 'dockerhub'){
+        sh "skopeo copy docker://docker.io/${imageName} docker-archive:${imageName}.tar"
     }
 }
