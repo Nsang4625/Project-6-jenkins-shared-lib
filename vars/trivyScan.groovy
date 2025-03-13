@@ -10,10 +10,10 @@
  */
 
 def call(Map config = [:]) {
-    validateInput()
+    validateInput(config)
     def outputFile = "trivy-scan-${env.GIT_COMMIT[0..8]}.json"
     def imageName = "${config.repository}:${config.tag}"
-    pullImage(imageName)
+    pullImage(imageName, config)
     def exitCode = sh script: """
         trivy image \
             --severity CRITICAL,HIGH \
@@ -56,7 +56,7 @@ private validateInput(){
     }
 }
 
-private void pullImage(String imageName){
+private void pullImage(String imageName, Map config){
     if(config.registryType == 'ecr'){
         sh "aws ecr get-login-password --region ${config.awsRegion} | skopeo login --username AWS --password-stdin ${config.awsAccountId}.dkr.ecr.${config.awsRegion}.amazonaws.com"
         sh "skopeo copy docker://${config.awsAccountId}.dkr.ecr.${config.awsRegion}.amazonaws.com/${imageName} docker-archive:${imageName}.tar"
