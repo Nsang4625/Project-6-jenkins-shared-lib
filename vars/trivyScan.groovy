@@ -39,9 +39,6 @@ private void handleScanResult(Map result, int exitCode, String outputFile) {
 }
 
 private void validateInput(Map config){
-    if(!config.registry){
-        error "Trivy scan failed: 'registry' parameter is required"
-    }
     if(!config.repository){
         error "Trivy scan failed: 'repository' parameter is required"
     }
