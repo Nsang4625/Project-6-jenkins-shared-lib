@@ -1,7 +1,7 @@
 /**
  * Generate Kaniko pod template to build and push Docker image to ECR
  * @param config Map of configuration options:
- * - language: Programming language/framework (required)
+ * - language: Programming language/framework (optional )
  * - repository: ECR repository name(required)
  * - tag: Docker image tag(required)
  * - registry: ECR registry URL(required)
