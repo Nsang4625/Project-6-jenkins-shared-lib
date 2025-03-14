@@ -2,6 +2,7 @@
  * Scans a Docker image using Trivy
  * 
  * @param config Map of configuration options:
+ * - commitId: identifier for the commit
  * - repository: Image repository name (required)
  * - tag: Image tag (required)
  * - registryType: Registry type(ecr | dockerhub) (required)
@@ -12,7 +13,7 @@
 def call(Map config = [:]) {
     validateInput(config)
     def outputFile = "trivy-scan.json"
-    def imageName = "${config.repository}:${config.tag}"
+    def imageName = "${config.repository}"
     pullImage(imageName, config)
     def exitCode = sh script: """
         trivy image \
@@ -21,24 +22,30 @@ def call(Map config = [:]) {
             --output ${outputFile} \
             --input ${imageName}.tar    
     """, returnStatus: true
+    sh "rm -f ${imageName}.tar"
 
-    def result = readJSON file: outputFile
-    handleScanResult(result, exitCode, outputFile)
+    def result = null
+    def jsonText = sh(script: "cat ${outputFile}", returnStdout: true).trim()
+    result = new groovy.json.JsonSlurperClassic().parseText(jsonText)
+    handleScanResult(result, exitCode, outputFile, config.commitId)
 }
 
-private def handleScanResult(Map result, int exitCode, String outputFile) {
+private def handleScanResult(Map result, int exitCode, String outputFile, String commitId){
     def criticalCount = result.Results.sum { it.Vulnerabilities.count { it.Severity == 'CRITICAL' } }
-    
     if (criticalCount > 0) {
-        sh "aws s3 cp ${outputFile} s3://my-bucket/trivy-reports/"
+        sh "aws s3 cp ${outputFile} s3://project-647-test-reports/${commitId}/trivy-reports"
         error "Trivy scan failed: ${criticalCount} critical vulnerabilities found"
     } else if (exitCode != 0) {
         error "Trivy scan failed with exit code ${exitCode}"
+    }  else {
+        sh "aws s3 cp ${outputFile} s3://project-647-test-reports/${commitId}/trivy-reports"
     }
-    sh "aws s3 cp ${outputFile} s3://my-bucket/trivy-reports/"
 }
 
 private def validateInput(Map config){
+    if(!config.commitId){
+        error "Trivy scan failed: 'commitId' parameter is required"
+    }
     if(!config.repository){
         error "Trivy scan failed: 'repository' parameter is required"
     }
@@ -55,28 +62,22 @@ private def validateInput(Map config){
 
 private def pullImage(String imageName, Map config){
     if(config.registryType == 'ecr'){
-        // Get ECR auth token
-        def ecrAuthToken = sh(script: "aws ecr get-login-password --region ${config.awsRegion}", returnStdout: true).trim()
+        // Get ECR registry and full image name
+        def registry = "${config.awsAccountId}.dkr.ecr.${config.awsRegion}.amazonaws.com"
+        def fullImageName = "${registry}/${config.repository}:${config.tag}"
         
-        // Set up a temp auth.json file in the workspace
-        def authConfig = """
-        {
-            "auths": {
-                "${config.awsAccountId}.dkr.ecr.${config.awsRegion}.amazonaws.com": {
-                    "auth": "${ecrAuthToken}"
-                }
-            }
-        }
-        """
-        writeFile file: "auth.json", text: authConfig
-        sh "cat auth.json"
-        
-        // Use the auth file with skopeo
+        // Get auth token and extract username/password
         sh """
-            skopeo copy --authfile=auth.json \
-                docker://${config.awsAccountId}.dkr.ecr.${config.awsRegion}.amazonaws.com/${config.repository}:${config.tag} \
+            # Get the ECR token and login
+            aws ecr get-login-password --region ${config.awsRegion} > ecr_token.txt
+            
+            # Use the token directly with skopeo
+            skopeo copy --src-creds="AWS:\$(cat ecr_token.txt)" \
+                docker://${fullImageName} \
                 docker-archive:${imageName}.tar
-            rm -f auth.json
+                
+            # Clean up
+            rm -f ecr_token.txt
         """
     } else if(config.registryType == 'dockerhub'){
         sh "skopeo copy docker://docker.io/${imageName} docker-archive:${imageName}.tar"
