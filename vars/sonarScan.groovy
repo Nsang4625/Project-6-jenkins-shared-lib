@@ -13,7 +13,7 @@
 def call(Map config = [:]) {
   validateConfig(config)
   withCredentials([string(credentialsId: "${config.sonarToken}", variable: 'SONAR_TOKEN')]) {
-    withSonarQubeEnv("${config.sonarServer}") {
+    withSonarQubeEnv("sonar-server") {
       sh """
       ${config.sonarScanner}/bin/sonar-scanner \
         -Dsonar.projectKey=${config.sonarProjectKey} \
