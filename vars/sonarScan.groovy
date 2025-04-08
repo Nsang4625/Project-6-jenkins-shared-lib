@@ -7,6 +7,7 @@
  * - sonarHostUrl: The SonarQube host URL (required)
  * - qualityGateTimeout: The timeout for the quality gate check (optional, default: 5 minutes)
  * - sonarServer: The SonarQube server name (optional, default: 'sonar-server')
+ * - sonarScanner: The SonarQube scanner name (optional, default: 'sonar-scanner')
  */
 
 def call(Map config = [:]) {
@@ -14,7 +15,7 @@ def call(Map config = [:]) {
   withCredentials([string(credentialsId: "${config.sonarToken}", variable: 'SONAR_TOKEN')]) {
     withSonarQubeEnv(config.sonarServer) {
       sh """
-      $SCANNER_HOME/bin/sonar-scanner \
+      ${config.sonarScanner}/bin/sonar-scanner \
         -Dsonar.projectKey=${config.sonarProjectKey} \
         -Dsonar.sources=. \
         -Dsonar.host.url=${config.sonarHostUrl} \
