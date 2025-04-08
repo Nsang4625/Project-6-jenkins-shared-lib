@@ -41,4 +41,5 @@ def validateConfig(Map config) {
   }
   if (!config.sonarServer) {
     config.sonarServer = 'sonar-server'
+  }
 }
