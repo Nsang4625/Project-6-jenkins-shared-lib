@@ -18,11 +18,17 @@ def call(Map config = [:]){
   if(config.language == 'java'){
     container(name: 'maven') {
       sh "mvn package"
+      sh "ls -la target/"
     }
   }
+  echo "Maven build completed, starting Kaniko build"
+  
   container(name: 'kaniko') {
+    sh "echo 'Kaniko container is running'"
+    sh "ls -la /"
     sh( "/kaniko/executor --context=${config.context} --dockerfile=${config.dockerfile} --destination=${config.registry}/${config.repository}:${config.tag}")
   }
+  echo "Build and push process completed"
 }
 
 private def validateConfig(Map config){
