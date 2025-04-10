@@ -17,7 +17,6 @@ def call(Map config = [:]) {
     pullImage(imageName, config)
     def exitCode = sh script: """
         trivy image \
-            --severity CRITICAL,HIGH \
             --format json \
             --output ${outputFile} \
             --input ${imageName}.tar    
