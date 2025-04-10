@@ -25,21 +25,19 @@ def call(Map config = [:]) {
 
     def result = null
     def jsonText = sh(script: "cat ${outputFile}", returnStdout: true).trim()
-    sh("cat ${outputFile}")
     result = new groovy.json.JsonSlurperClassic().parseText(jsonText)
     handleScanResult(result, exitCode, outputFile, config.commitId)
 }
 
 private def handleScanResult(Map result, int exitCode, String outputFile, String commitId){
     def criticalCount = result.Results.sum { it.Vulnerabilities.count { it.Severity == 'CRITICAL' } }
-    if (criticalCount > 0) {
-        sh "aws s3 cp ${outputFile} s3://project-647-test-reports/${commitId}/trivy-reports"
-        echo "Trivy scan failed: ${criticalCount} critical vulnerabilities found"
-    } else if (exitCode != 0) {
+    if(exitCode != 0){
         error "Trivy scan failed with exit code ${exitCode}"
-    }  else {
-        sh "aws s3 cp ${outputFile} s3://project-647-test-reports/${commitId}/trivy-reports"
     }
+    if(criticalCount > 0){
+        echo "Trivy scan failed: ${criticalCount} critical vulnerabilities found"
+    }
+    sh "aws s3 cp ${outputFile} s3://project-647-test-reports/${commitId}/trivy-reports"
 }
 
 private def validateInput(Map config){
@@ -66,19 +64,19 @@ private def pullImage(String imageName, Map config){
         def registry = "${config.awsAccountId}.dkr.ecr.${config.awsRegion}.amazonaws.com"
         def fullImageName = "${registry}/${config.repository}:${config.tag}"
         
-        // Get auth token and extract username/password
-        sh """
-            # Get the ECR token and login
-            aws ecr get-login-password --region ${config.awsRegion} > ecr_token.txt
-            
-            # Use the token directly with skopeo
-            skopeo copy --src-creds="AWS:\$(cat ecr_token.txt)" \
-                docker://${fullImageName} \
-                docker-archive:${imageName}.tar
-                
-            # Clean up
-            rm -f ecr_token.txt
-        """
+        // Get the token
+        def ecrToken = sh(script: "aws ecr get-login-password --region ${config.awsRegion}", returnStdout: true).trim()
+        
+        // Use maskPasswords to hide the token in logs
+        wrap([$class: 'MaskPasswordsBuildWrapper', 
+              varPasswordPairs: [[password: ecrToken, var: 'ECR_TOKEN']]]) {
+            sh """
+                ECR_TOKEN='${ecrToken}'
+                skopeo copy --src-creds="AWS:\$ECR_TOKEN" \
+                    docker://${fullImageName} \
+                    docker-archive:${imageName}.tar
+            """
+        }
     } else if(config.registryType == 'dockerhub'){
         sh "skopeo copy docker://docker.io/${imageName} docker-archive:${imageName}.tar"
     }
