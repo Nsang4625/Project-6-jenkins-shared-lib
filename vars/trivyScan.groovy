@@ -26,6 +26,7 @@ def call(Map config = [:]) {
 
     def result = null
     def jsonText = sh(script: "cat ${outputFile}", returnStdout: true).trim()
+    sh("cat ${outputFile}")
     result = new groovy.json.JsonSlurperClassic().parseText(jsonText)
     handleScanResult(result, exitCode, outputFile, config.commitId)
 }
